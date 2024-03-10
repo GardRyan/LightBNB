@@ -44,7 +44,7 @@ const getUserWithId = function (id) {
     .query(`SELECT * FROM users WHERE user.id = $1;`, [id])
     .then((result) => {
       console.log(result.rows);
-      return result.rows;
+      return result.rows[0];
     })
     .catch((err) => {
       console.log(err.message);
@@ -80,10 +80,13 @@ const addUser = function (user) {
  */
 const getAllReservations = function (guest_id, limit = 10) {
   return client
-    .query(`SELECT * FROM properties WHERE guest_id = $1, Limit = $2;`, [
-      guest_id,
-      limit,
-    ])
+    .query(
+      `SELECT * FROM reservations 
+    JOIN properties ON reservations.property_id = properties.id 
+    JOIN property_reviews ON property_reviews.property_id = properties.id
+    WHERE guest_id = $1, Limit $2;`,
+      [guest_id, limit]
+    )
     .then((result) => {
       console.log(result.rows);
       return result.rows;
