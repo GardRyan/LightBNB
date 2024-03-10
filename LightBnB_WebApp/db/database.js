@@ -78,23 +78,63 @@ const addUser = function (user) {
  * @param {string} guest_id The id of the user.
  * @return {Promise<[{}]>} A promise to the reservations.
  */
-const getAllReservations = function (guest_id, limit = 10) {
-  return client
-    .query(
-      `SELECT * FROM reservations 
+const getAllReservations = function (guest_id, options = {}) {
+  // Prepare the base query
+  let query = `
+    SELECT * FROM reservations 
     JOIN properties ON reservations.property_id = properties.id 
     JOIN property_reviews ON property_reviews.property_id = properties.id
-    WHERE guest_id = $1, Limit $2;`,
-      [guest_id, limit]
-    )
+    WHERE guest_id = $1`;
+
+  // Prepare an array to hold the parameter values
+  const queryParams = [guest_id];
+
+  // Check if there are filtering options
+  if (Object.keys(options).length > 0) {
+    query += ' AND';
+
+    // City filter
+    if (options.city) {
+      query += ' properties.city = $' + (queryParams.length + 1);
+      queryParams.push(options.city);
+    }
+
+    // Minimum price per night filter
+    if (options.minimum_price_per_night) {
+      query += ' AND properties.cost_per_night >= $' + (queryParams.length + 1);
+      queryParams.push(options.minimum_price_per_night);
+    }
+
+    // Maximum price per night filter
+    if (options.maximum_price_per_night) {
+      query += ' AND properties.cost_per_night <= $' + (queryParams.length + 1);
+      queryParams.push(options.maximum_price_per_night);
+    }
+
+    // Minimum rating filter
+    if (options.minimum_rating) {
+      query += ' AND property_reviews.rating >= $' + (queryParams.length + 1);
+      queryParams.push(options.minimum_rating);
+    }
+  }
+
+  // Add the limit clause to the query
+  query += ' LIMIT $' + (queryParams.length + 1);
+  queryParams.push(options.limit || 10); // Default limit is 10 if not specified
+
+  // Execute the query
+  return client
+    .query(query, queryParams)
     .then((result) => {
       console.log(result.rows);
       return result.rows;
     })
     .catch((err) => {
       console.log(err.message);
+      throw err; // Propagate the error
     });
 };
+
 /// Properties
 
 /**
@@ -121,10 +161,15 @@ const getAllProperties = (options, limit = 10) => {
  * @return {Promise<{}>} A promise to the property.
  */
 const addProperty = function (property) {
-  const propertyId = Object.keys(properties).length + 1;
-  property.id = propertyId;
-  properties[propertyId] = property;
-  return Promise.resolve(property);
+  return client
+  .query(`INSERT INTO properties (owner_id, title, description, thumbnail_photo_url, cover_photo_url, cost_per_night, street, city, province, post_code, country, parking_spaces, number_of_bathrooms, number_of_bedrooms) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)  RETURNING *;`, [property])
+  .then((result) => {
+    console.log(result.rows);
+    return result.rows;
+  })
+  .catch((err) => {
+    console.log(err.message);
+  });
 };
 
 module.exports = {
